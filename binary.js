@@ -3,6 +3,8 @@ import autoprefixer   from 'autoprefixer-core';
 import path           from 'path';
 import fs             from 'fs-extra';
 
+var glob = require("glob")
+
 export default class Binary {
     constructor(process) {
         this.arguments = process.argv.slice(2);
@@ -13,6 +15,7 @@ export default class Binary {
         this.status     = 0;
         this.command    = 'compile';
         this.inputFiles = [];
+        this.inputDir   = '';
 
         this.processOptions   = { };
         this.processorOptions = { };
@@ -31,6 +34,7 @@ Options:
   -c, --clean              remove all known prefixes
   -o, --output FILE        set output file
   -d, --dir DIR            set output dir
+  -e, --inputdir           input directory to map to output dir, requires -d
   -m, --map                generate source map
       --no-map             skip source map even if previous map exists
       --no-inline-map      do not inline maps to data:uri
@@ -57,6 +61,7 @@ Options:
 
   You can specify output file or directory by '-o' argument.
   For several input files you can specify only output directory by '-d'.
+  For input directory, you can specify '-e' followed by output directory '-d'.
 
   Output CSS will be written to stdout stream on '-o -' argument or stdin input.
 
@@ -169,6 +174,9 @@ Browsers:
 
             } else if ( arg === '-d' || arg === '--dir' ) {
                 this.outputDir = args.shift();
+
+            } else if ( arg === '-e' || arg === '--inputdir' ) {
+                this.inputDir = args.shift();
 
             } else {
                 if ( arg.match(/^-\w$/) || arg.match(/^--\w[\w-]+$/) ) {
@@ -290,13 +298,20 @@ Browsers:
 
     // Return input and output files array
     files() {
-        if ( this.inputFiles.length === 0 && !this.outputFile ) {
+        if ( this.inputFiles.length === 0 && !this.outputFile && !this.inputDir ) {
             this.outputFile = '-';
         }
 
         let file;
         let list = [];
-        if ( this.outputDir ) {
+        if ( this.inputDir ) {
+            let files = glob.sync(this.inputDir + "/**/*.css");
+            for ( file of files ) {
+                let outFile = file.replace(this.inputDir, this.outputDir);
+                list.push([file, outFile]);
+            }
+        }
+        else if ( this.outputDir ) {
             if ( this.inputFiles.length === 0 ) {
                 this.error('autoprefixer: For STDIN input you need ' +
                            'to specify output file (by -o FILE),\n ' +
